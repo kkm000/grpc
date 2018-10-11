@@ -44,6 +44,7 @@ namespace Grpc.Tools {
     public enum CpuKind { Unknown, X86, X64 };
     public static readonly CpuKind Cpu;
 
+    public static readonly bool IsMono;
     // This is not necessarily true, but good enough. BCL lacks a per-FS
     // API to determine file case sensitivity.
     public static bool IsFsCaseInsensitive => Os == OsKind.Windows;
@@ -51,6 +52,7 @@ namespace Grpc.Tools {
 
     static Platform() {
 #if NETSTANDARD
+      IsMono = false;
       Os = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? OsKind.Windows
          : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? OsKind.Linux
          : RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? OsKind.MacOsX
@@ -64,16 +66,15 @@ namespace Grpc.Tools {
       }
 #else
       // Running under either Mono or full MS framework.
+      IsMono = Type.GetType("Mono.Runtime", throwOnError: false) != null;
       Os = OsKind.Windows;
-      if (Type.GetType("Mono.Runtime", throwOnError: false) != null) {
+      if (IsMono) {
         // Congratulations. We are running under Mono.
         var plat = Environment.OSVersion.Platform;
         if (plat == PlatformID.MacOSX) {
           Os = OsKind.MacOsX;
         } else if (plat == PlatformID.Unix || (int)plat == 128) {
-          // TODO(kkm): This is how Mono detects OSX internally. Looks cheesy
-          // to me. Would not testing for /proc absence be more reliable? OSX
-          // did never have it, AFAIK.
+          // This is how Mono detects OSX internally.
           Os = File.Exists("/usr/lib/libc.dylib") ? OsKind.MacOsX : OsKind.Linux;
         }
       }
